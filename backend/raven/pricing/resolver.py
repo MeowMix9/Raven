@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from raven.pricing.models import ResolvedPricingValue
 from raven.pricing.repositories import PricingRepository
 
 
@@ -15,13 +16,6 @@ class PricingResolutionRequest:
     customer_id: UUID | None = None
     product_id: UUID | None = None
     quantity: Decimal | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedPricingValue:
-    key: str
-    value: Decimal | str | bool
-    source_profile_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
