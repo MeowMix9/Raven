@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from raven.pricing.models import ResolvedPricingValue
+from raven.pricing.resolver import PricingResolver
 from raven.pricing.rules import PricingRule
 from raven.quotes.calculation import CalculateQuote
 from raven.quotes.models import Quote, QuoteItem
@@ -86,7 +87,7 @@ def test_quote_service_calculates_then_saves_snapshot():
 
     result = QuoteService(
         CalculateQuote(
-            pricing_resolver=__import__("raven.pricing.resolver", fromlist=["PricingResolver"]).PricingResolver(repository),
+            pricing_resolver=PricingResolver(repository),
             pricing_repository=repository,
         ),
         SaveQuote(quote_repository),
