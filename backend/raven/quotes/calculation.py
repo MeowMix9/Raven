@@ -9,6 +9,7 @@ from raven.pricing.pipeline import CalculationLine, CalculationResult, PricingCa
 from raven.pricing.repositories import PricingRepository
 from raven.pricing.resolver import PricingResolutionRequest, PricingResolver
 from raven.pricing.rules import PricingRuleEvaluator
+from raven.quotes.snapshot import CalculationSnapshot
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,12 +21,15 @@ class QuoteCalculationRequest:
     product_id: UUID | None = None
     quantity: Decimal | None = None
     context: dict[str, object] | None = None
+    engine_version: str = "raven-pricing-v1"
+    pricing_profile_version: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class QuoteCalculationResult:
     pricing_profile_id: UUID
     calculation: CalculationResult
+    snapshot: CalculationSnapshot
 
 
 class CalculateQuote:
@@ -73,7 +77,15 @@ class CalculateQuote:
             rule_result,
             request.lines,
         )
+        snapshot = CalculationSnapshot.from_calculation(
+            pricing=pricing,
+            rules=rule_result,
+            calculation=calculation,
+            engine_version=request.engine_version,
+            pricing_profile_version=request.pricing_profile_version,
+        )
         return QuoteCalculationResult(
             pricing_profile_id=pricing.profile_id,
             calculation=calculation,
+            snapshot=snapshot,
         )
