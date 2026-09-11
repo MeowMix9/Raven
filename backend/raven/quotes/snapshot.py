@@ -21,6 +21,7 @@ class PricingValueSnapshot:
         return {
             "key": self.key,
             "value": _serialize_value(self.value),
+            "value_type": _value_type(self.value),
             "source_profile_id": str(self.source_profile_id),
         }
 
@@ -64,7 +65,7 @@ class CalculationSnapshot:
         calculation: CalculationResult,
         engine_version: str,
         pricing_profile_version: int | None = None,
-    ) -> CalculationSnapshot:
+    ) -> "CalculationSnapshot":
         if not engine_version.strip():
             raise ValueError("Calculation engine version cannot be blank")
 
@@ -121,6 +122,16 @@ def _freeze_value(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(_freeze_value(item) for item in value)
     return value
+
+
+def _value_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, Decimal):
+        return "decimal"
+    if isinstance(value, str):
+        return "string"
+    return type(value).__name__
 
 
 def _serialize_value(value: Any) -> Any:
