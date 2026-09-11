@@ -67,6 +67,24 @@ class SqlAlchemyQuoteRepository(QuoteRepository):
             row.calculation_snapshot_json = snapshot.to_dict()
             row.calculation_engine_version = snapshot.engine_version
         else:
+            row.subtotal = sum((item.extended_cost for item in quote.items), Decimal("0"))
+            row.adjustments = Decimal("0")
+            row.total_cost = row.subtotal
+            row.total_price = sum(
+                (
+                    item.extended_price
+                    if item.extended_price is not None
+                    else item.extended_cost
+                    for item in quote.items
+                ),
+                Decimal("0"),
+            )
+            row.gross_profit = row.total_price - row.total_cost
+            row.gross_margin_percent = (
+                (row.gross_profit / row.total_price) * Decimal("100")
+                if row.total_price != 0
+                else Decimal("0")
+            )
             row.calculation_snapshot_json = None
             row.calculation_engine_version = "raven-pricing-v1"
 
@@ -76,9 +94,8 @@ class SqlAlchemyQuoteRepository(QuoteRepository):
         )
         self._session.execute(delete(QuoteItemRow).where(QuoteItemRow.quote_id == quote.quote_id))
 
-        calculation = snapshot.calculation if snapshot is not None else None
         for item in quote.items:
-            calculated_line = _find_calculation_line(calculation, item.line_number)
+            unit_price, extended_price = _resolve_item_prices(item, calculated=snapshot is not None)
             self._session.add(
                 QuoteItemRow(
                     quote_id=quote.quote_id,
@@ -90,20 +107,12 @@ class SqlAlchemyQuoteRepository(QuoteRepository):
                     quantity=item.quantity,
                     unit_of_measure=item.unit_of_measure,
                     unit_cost=item.unit_cost,
-                    unit_price=(
-                        calculated_line.extended_cost / calculated_line.quantity
-                        if calculated_line is not None and calculated_line.quantity != 0
-                        else item.unit_cost
-                    ),
+                    unit_price=unit_price,
                     extended_cost=item.extended_cost,
-                    extended_price=(
-                        calculated_line.extended_cost
-                        if calculated_line is not None
-                        else item.extended_cost
-                    ),
-                    discount_amount=Decimal("0"),
-                    markup_amount=Decimal("0"),
-                    margin_amount=Decimal("0"),
+                    extended_price=extended_price,
+                    discount_amount=item.discount_amount,
+                    markup_amount=item.markup_amount,
+                    margin_amount=item.margin_amount,
                     options_json=dict(item.metadata),
                     calculation_snapshot_json=(
                         snapshot.to_dict() if snapshot is not None else None
@@ -167,6 +176,11 @@ class SqlAlchemyQuoteRepository(QuoteRepository):
                 extended_cost=item.extended_cost,
                 vendor_id=item.vendor_id,
                 vendor_product_id=item.vendor_product_id,
+                unit_price=item.unit_price,
+                extended_price=item.extended_price,
+                discount_amount=item.discount_amount,
+                markup_amount=item.markup_amount,
+                margin_amount=item.margin_amount,
                 metadata=dict(item.options_json or {}),
             )
             for item in item_rows
@@ -191,20 +205,33 @@ class SqlAlchemyQuoteRepository(QuoteRepository):
         )
 
 
+def _resolve_item_prices(item: QuoteItem, *, calculated: bool) -> tuple[Decimal, Decimal]:
+    """Return explicit sell prices without pretending cost is sell price.
+
+    The current calculation engine produces quote-level totals, not per-line
+    sell-price allocations. A calculated quote therefore must carry explicit
+    line prices before persistence. Draft quotes may temporarily use cost as
+    their display price when no sell price has been entered yet.
+    """
+    if item.unit_price is not None and item.extended_price is not None:
+        return item.unit_price, item.extended_price
+
+    if calculated:
+        raise ValueError(
+            f"Calculated quote item {item.line_number} requires explicit unit_price and extended_price"
+        )
+
+    unit_price = item.unit_price if item.unit_price is not None else item.unit_cost
+    extended_price = (
+        item.extended_price
+        if item.extended_price is not None
+        else item.extended_cost
+    )
+    return unit_price, extended_price
+
+
 def _date_to_datetime(value: date) -> datetime:
     return datetime.combine(value, time.min, tzinfo=timezone.utc)
-
-
-def _find_calculation_line(
-    calculation: CalculationResult | None,
-    line_number: int,
-) -> CalculationLine | None:
-    if calculation is None:
-        return None
-    index = line_number - 1
-    if 0 <= index < len(calculation.lines):
-        return calculation.lines[index]
-    return None
 
 
 def _snapshot_from_dict(payload: dict[str, Any] | None) -> CalculationSnapshot | None:
