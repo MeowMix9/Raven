@@ -4,8 +4,12 @@ from uuid import uuid4
 
 import pytest
 
+from raven.pricing.models import ResolvedPricingValue
 from raven.pricing.pipeline import CalculationLine, CalculationResult
+from raven.pricing.resolver import ResolvedPricingContext
+from raven.pricing.rules import RuleEvaluationResult
 from raven.quotes.models import Quote, QuoteItem, QuoteStatus
+from raven.quotes.snapshot import CalculationSnapshot
 
 
 def item() -> QuoteItem:
@@ -83,7 +87,7 @@ def test_quote_calculation_lines_are_derived_from_items() -> None:
     )
 
 
-def test_mark_calculated_updates_lifecycle_and_snapshot_reference() -> None:
+def test_mark_calculated_uses_snapshot_as_historical_authority() -> None:
     quote = make_quote()
     calculation = CalculationResult(
         lines=quote.calculation_lines(),
@@ -95,9 +99,53 @@ def test_mark_calculated_updates_lifecycle_and_snapshot_reference() -> None:
         applied_rule_ids=(),
         trace=(),
     )
+    pricing = ResolvedPricingContext(
+        profile_id=quote.pricing_profile_id,
+        as_of=quote.quote_date,
+        values=(
+            ResolvedPricingValue(
+                key="markup_percent",
+                value=Decimal("0.25"),
+                source_profile_id=quote.pricing_profile_id,
+            ),
+        ),
+    )
+    snapshot = CalculationSnapshot.from_calculation(
+        pricing=pricing,
+        rules=RuleEvaluationResult(applied_rule_ids=(), changes=()),
+        calculation=calculation,
+        engine_version="raven-pricing-v1",
+    )
 
-    quote.mark_calculated(calculation, engine_version="raven-pricing-v1")
+    quote.mark_calculated(snapshot)
 
     assert quote.status == QuoteStatus.CALCULATED
     assert quote.calculation is calculation
+    assert quote.calculation_snapshot is snapshot
     assert quote.calculation_engine_version == "raven-pricing-v1"
+
+
+def test_mark_calculated_rejects_wrong_pricing_profile() -> None:
+    quote = make_quote()
+    snapshot = CalculationSnapshot.from_calculation(
+        pricing=ResolvedPricingContext(
+            profile_id=uuid4(),
+            as_of=quote.quote_date,
+            values=(),
+        ),
+        rules=RuleEvaluationResult(applied_rule_ids=(), changes=()),
+        calculation=CalculationResult(
+            lines=quote.calculation_lines(),
+            subtotal_cost=Decimal("20"),
+            total_cost=Decimal("20"),
+            total_price=Decimal("20"),
+            gross_profit=Decimal("0"),
+            gross_margin_percent=Decimal("0"),
+            applied_rule_ids=(),
+            trace=(),
+        ),
+        engine_version="raven-pricing-v1",
+    )
+
+    with pytest.raises(ValueError, match="pricing profile"):
+        quote.mark_calculated(snapshot)
