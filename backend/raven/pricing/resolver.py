@@ -5,6 +5,8 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from raven.pricing.repositories import PricingRepository
+
 
 @dataclass(frozen=True, slots=True)
 class PricingResolutionRequest:
@@ -12,6 +14,7 @@ class PricingResolutionRequest:
     as_of: date
     customer_id: UUID | None = None
     product_id: UUID | None = None
+    quantity: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,13 +30,33 @@ class ResolvedPricingContext:
     as_of: date
     values: tuple[ResolvedPricingValue, ...]
 
+    def get(self, key: str) -> ResolvedPricingValue | None:
+        for value in self.values:
+            if value.key == key:
+                return value
+        return None
+
 
 class PricingResolver:
-    """Application boundary for deterministic pricing-value resolution.
+    """Resolve the effective pricing configuration for a quote calculation."""
 
-    Persistence and scope-selection rules will be supplied by repositories.
-    The resolver itself must never contain business pricing constants.
-    """
+    def __init__(self, repository: PricingRepository) -> None:
+        self._repository = repository
 
     def resolve(self, request: PricingResolutionRequest) -> ResolvedPricingContext:
-        raise NotImplementedError("Pricing resolution repository is not wired yet")
+        profile_id = self._repository.resolve_profile_id(
+            requested_profile_id=request.profile_id,
+            customer_id=request.customer_id,
+            product_id=request.product_id,
+            as_of=request.as_of,
+        )
+        values = self._repository.get_values(
+            profile_id=profile_id,
+            as_of=request.as_of,
+            quantity=request.quantity,
+        )
+        return ResolvedPricingContext(
+            profile_id=profile_id,
+            as_of=request.as_of,
+            values=values,
+        )
