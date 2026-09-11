@@ -2,12 +2,12 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from raven.infrastructure.quotes.repository import _snapshot_from_dict
 from raven.pricing.models import ResolvedPricingValue
 from raven.pricing.pipeline import CalculationLine, CalculationResult, CalculationTraceEntry
 from raven.pricing.resolver import ResolvedPricingContext
 from raven.pricing.rules import RuleEvaluationResult
 from raven.quotes.snapshot import CalculationSnapshot
-from raven.infrastructure.quotes.repository import _snapshot_from_dict
 
 
 PROFILE_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -72,7 +72,7 @@ def test_persisted_snapshot_round_trips_without_float_conversion() -> None:
     assert restored is not None
     assert restored.pricing_profile_id == PROFILE_ID
     assert restored.pricing_profile_version == 4
-    assert restored.pricing_values[0].value == "0.2500"
+    assert restored.pricing_values[0].value == Decimal("0.2500")
     assert restored.calculation.total_price == Decimal("25.0000")
     assert restored.calculation.gross_margin_percent == Decimal("20.0000")
     assert restored.calculation.trace[0].operand == Decimal("0.2500")
