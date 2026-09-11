@@ -6,7 +6,8 @@ from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from raven.pricing.pipeline import CalculationLine, CalculationResult
+from raven.pricing.pipeline import CalculationLine
+from raven.quotes.snapshot import CalculationSnapshot
 
 
 class QuoteStatus(StrEnum):
@@ -49,8 +50,7 @@ class Quote:
     items: tuple[QuoteItem, ...]
     status: QuoteStatus = QuoteStatus.DRAFT
     notes: str | None = None
-    calculation: CalculationResult | None = None
-    calculation_engine_version: str | None = None
+    calculation_snapshot: CalculationSnapshot | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -90,9 +90,20 @@ class Quote:
             notes=notes,
         )
 
-    def mark_calculated(self, calculation: CalculationResult, *, engine_version: str) -> None:
-        self.calculation = calculation
-        self.calculation_engine_version = engine_version
+    @property
+    def calculation(self):
+        """Return the calculated result from the historical snapshot, if present."""
+        return self.calculation_snapshot.calculation if self.calculation_snapshot else None
+
+    @property
+    def calculation_engine_version(self) -> str | None:
+        """Return the engine version recorded in the historical snapshot."""
+        return self.calculation_snapshot.engine_version if self.calculation_snapshot else None
+
+    def mark_calculated(self, snapshot: CalculationSnapshot) -> None:
+        if snapshot.pricing_profile_id != self.pricing_profile_id:
+            raise ValueError("Calculation snapshot pricing profile does not match quote")
+        self.calculation_snapshot = snapshot
         self.status = QuoteStatus.CALCULATED
 
     def calculation_lines(self) -> tuple[CalculationLine, ...]:
