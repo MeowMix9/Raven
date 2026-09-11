@@ -54,7 +54,8 @@ Lifecycle transitions belong to the quote domain/application layer rather than t
 3. Pricing rule retrieval.
 4. Rule evaluation using quote context.
 5. Calculation pipeline execution.
-6. Return of an explainable calculation result.
+6. Immutable calculation snapshot creation.
+7. Return of an explainable calculation result and snapshot.
 
 ```text
 QuoteCalculationRequest
@@ -69,6 +70,8 @@ QuoteCalculationRequest
         +--> PricingRuleEvaluator
         |
         +--> PricingCalculationPipeline
+        |
+        +--> CalculationSnapshot
         |
         v
 QuoteCalculationResult
@@ -100,7 +103,58 @@ The snapshot is immutable in the domain model. Nested rule/action structures are
 
 `CalculationSnapshot.to_dict()` produces a JSON-compatible persistence representation. Decimal monetary and percentage values are serialized as strings rather than binary floating-point numbers.
 
-The database representation may use JSON for the immutable snapshot, while the normalized quote tables remain authoritative for searchable business entities.
+## Persistence boundary
+
+The quote domain depends on the `QuoteRepository` protocol rather than SQLAlchemy or PostgreSQL.
+
+```text
+Quote Domain
+     |
+     v
+QuoteRepository
+     |
+     v
+SqlAlchemyQuoteRepository
+     |
+     +--> quotes
+     +--> quote_items
+     +--> quote_calculations
+```
+
+The repository is responsible for translating between the domain model and persistence models. SQLAlchemy entities never cross back into the domain layer.
+
+The persistence strategy deliberately uses two representations of calculation data:
+
+1. **Normalized columns** on `quotes` and `quote_items` for filtering, reporting, sorting, and ordinary application queries.
+2. **`calculation_snapshot_json`** for the immutable historical calculation record.
+
+The JSON snapshot is the historical calculation authority. Normalized totals are queryable projections of that snapshot, not an alternate calculation engine.
+
+`quote_calculations` stores trace entries in a queryable form for operational reporting and future audit tooling. It does not replace the immutable snapshot.
+
+Saving a quote is transactional: the quote row, its items, and its calculation trace are persisted through the same repository/session boundary.
+
+## Quote rehydration
+
+When a persisted quote is loaded, the repository reconstructs the domain `Quote` and its `CalculationSnapshot` from durable data. The resulting domain object does not need access to the current pricing profile, rules, or pricing values to understand its historical calculation.
+
+That means this remains valid even after configuration changes:
+
+```text
+2026-09-11
+Markup = 25%
+Quote calculated
+       |
+       v
+Immutable snapshot
+       |
+       +----------------------+
+                              |
+2026-10-01                   |
+Markup changed to 30%         |
+                              v
+                    Existing quote still = 25%
+```
 
 ## Quote items
 
