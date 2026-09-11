@@ -76,17 +76,18 @@ QuoteCalculationResult
 
 The service does not contain pricing constants and does not implement presentation concerns.
 
-## Calculation snapshots
+## Immutable calculation snapshots
 
-Once a quote is calculated, the result must remain historically reproducible even if pricing configuration changes later.
+Once a quote is calculated, the historical calculation must not depend on mutable pricing configuration. If a markup changes from 25% to 30% tomorrow, an existing quote calculated at 25% must still represent the 25% calculation.
 
-The persisted snapshot should preserve, at minimum:
+Raven therefore creates a `CalculationSnapshot` at the calculation boundary. The snapshot contains value copies, not references to live configuration objects.
+
+The snapshot preserves, at minimum:
 
 - pricing profile ID/version
 - effective pricing values used
-- applicable rule IDs and actions
-- vendor/product values used by the calculation
-- quantities and options
+- applicable rule IDs and action payloads
+- quantities and options represented by the calculation
 - calculation engine version
 - line costs
 - total cost
@@ -94,6 +95,10 @@ The persisted snapshot should preserve, at minimum:
 - gross profit
 - gross margin
 - calculation trace
+
+The snapshot is immutable in the domain model. Nested rule/action structures are converted to immutable tuples so later mutation of the source configuration cannot change the historical record.
+
+`CalculationSnapshot.to_dict()` produces a JSON-compatible persistence representation. Decimal monetary and percentage values are serialized as strings rather than binary floating-point numbers.
 
 The database representation may use JSON for the immutable snapshot, while the normalized quote tables remain authoritative for searchable business entities.
 
