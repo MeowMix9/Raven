@@ -32,6 +32,11 @@ class QuoteItem:
     extended_cost: Decimal
     vendor_id: UUID | None = None
     vendor_product_id: UUID | None = None
+    unit_price: Decimal | None = None
+    extended_price: Decimal | None = None
+    discount_amount: Decimal = Decimal("0")
+    markup_amount: Decimal = Decimal("0")
+    margin_amount: Decimal = Decimal("0")
     metadata: dict[str, object] = field(default_factory=dict)
 
 
