@@ -5,6 +5,8 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from raven.pricing.actions import PricingActionValidationError, normalize_pricing_action
+
 
 class PricingRuleEvaluationError(ValueError):
     """Raised when a configured pricing rule cannot be evaluated safely."""
@@ -148,12 +150,21 @@ def _comparable(actual: Any, expected: Any) -> tuple[Any, Any]:
 
 
 def _normalize_action(action: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(action, dict) or not action:
-        raise PricingRuleEvaluationError("Rule action must be a non-empty object")
+    try:
+        normalized = normalize_pricing_action(action)
+    except PricingActionValidationError as exc:
+        raise PricingRuleEvaluationError(str(exc)) from exc
 
     result = dict(action)
-    if "type" not in result:
-        raise PricingRuleEvaluationError("Rule action requires a type")
-    if not isinstance(result["type"], str) or not result["type"]:
-        raise PricingRuleEvaluationError("Rule action type must be a non-empty string")
+    result["type"] = normalized.type
+    if normalized.target is not None:
+        result["target"] = normalized.target
+    if normalized.value is not None:
+        result["value"] = normalized.value
+    if normalized.value_key is not None:
+        result["value_key"] = normalized.value_key
+    if normalized.label is not None:
+        result["label"] = normalized.label
+    if normalized.currency is not None:
+        result["currency"] = normalized.currency
     return result
