@@ -159,8 +159,6 @@ def _normalize_action(action: dict[str, Any]) -> dict[str, Any]:
     result["type"] = normalized.type
     if normalized.target is not None:
         result["target"] = normalized.target
-    if normalized.value is not None:
-        result["value"] = normalized.value
     if normalized.value_key is not None:
         result["value_key"] = normalized.value_key
     if normalized.label is not None:
