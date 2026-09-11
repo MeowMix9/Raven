@@ -11,19 +11,20 @@ class PricingProfileSelectionError(LookupError):
 
 @dataclass(frozen=True, slots=True)
 class PricingProfileCandidate:
-    """A pricing profile assignment eligible for deterministic selection.
-
-    The persistence layer is responsible for loading candidate assignments and
-    profile metadata. This selector intentionally contains no pricing values.
-    """
+    """A pricing profile assignment considered by the domain selector."""
 
     profile_id: UUID
     scope_type: str
     scope_id: UUID | None
     assignment_priority: int
     profile_priority: int
-    effective_from: date | None
+    assignment_effective_from: date | None
+    assignment_effective_to: date | None
+    profile_effective_from: date | None
+    profile_effective_to: date | None
     profile_version: int
+    assignment_is_active: bool = True
+    profile_is_active: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,8 +37,6 @@ class PricingProfileSelection:
 
 
 # Scope specificity is an algorithmic precedence rule, not a pricing value.
-# Unknown scopes are deliberately lowest specificity so adding a new scope
-# cannot silently outrank an explicitly supported scope.
 _SCOPE_SPECIFICITY: dict[str, int] = {
     "CUSTOMER": 3,
     "PRODUCT": 2,
@@ -66,9 +65,7 @@ def select_pricing_profile(
     5. Highest profile version.
     6. Stable UUID ordering as the final deterministic tie-breaker.
 
-    Candidates should already represent active assignments and active profiles.
-    The selector still filters effective dates so the domain rule cannot be
-    bypassed accidentally by a repository implementation.
+    Pricing amounts and business-specific rates are never embedded here.
     """
 
     effective = tuple(
@@ -88,10 +85,8 @@ def select_pricing_profile(
             _specificity(candidate),
             candidate.assignment_priority,
             candidate.profile_priority,
-            candidate.effective_from or date.min,
+            _most_recent_effective_date(candidate),
             candidate.profile_version,
-            # max() chooses the greatest value. UUID hex gives us a stable,
-            # database-independent final ordering without relying on row order.
             candidate.profile_id.hex,
         ),
     )
@@ -104,9 +99,39 @@ def select_pricing_profile(
 
 
 def _is_effective(candidate: PricingProfileCandidate, *, as_of: date) -> bool:
-    if candidate.effective_from is not None and candidate.effective_from > as_of:
+    if not candidate.assignment_is_active or not candidate.profile_is_active:
         return False
-    # Assignment/profile end dates are represented by the candidate's effective
-    # start only at this layer. Repository adapters must exclude expired profile
-    # and assignment records before constructing candidates.
+
+    if not _date_range_contains(
+        as_of,
+        candidate.assignment_effective_from,
+        candidate.assignment_effective_to,
+    ):
+        return False
+
+    return _date_range_contains(
+        as_of,
+        candidate.profile_effective_from,
+        candidate.profile_effective_to,
+    )
+
+
+def _date_range_contains(
+    value: date,
+    effective_from: date | None,
+    effective_to: date | None,
+) -> bool:
+    if effective_from is not None and effective_from > value:
+        return False
+    if effective_to is not None and effective_to <= value:
+        return False
     return True
+
+
+def _most_recent_effective_date(candidate: PricingProfileCandidate) -> date:
+    """Return the strongest effective-start date available for tie-breaking."""
+
+    return max(
+        candidate.assignment_effective_from or date.min,
+        candidate.profile_effective_from or date.min,
+    )
