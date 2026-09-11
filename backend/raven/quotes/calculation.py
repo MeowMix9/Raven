@@ -6,6 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from raven.pricing.pipeline import CalculationLine, CalculationResult, PricingCalculationPipeline
+from raven.pricing.repositories import PricingRepository
 from raven.pricing.resolver import PricingResolutionRequest, PricingResolver
 from raven.pricing.rules import PricingRuleEvaluator
 
@@ -33,7 +34,7 @@ class CalculateQuote:
     def __init__(
         self,
         pricing_resolver: PricingResolver,
-        pricing_repository,
+        pricing_repository: PricingRepository,
         rule_evaluator: PricingRuleEvaluator | None = None,
         calculation_pipeline: PricingCalculationPipeline | None = None,
     ) -> None:
@@ -58,8 +59,7 @@ class CalculateQuote:
         )
 
         context: dict[str, object] = dict(request.context or {})
-        context.setdefault("quote", {})
-        quote_context = context["quote"]
+        quote_context = context.setdefault("quote", {})
         if not isinstance(quote_context, dict):
             raise ValueError("Quote calculation context 'quote' must be an object")
         quote_context.setdefault("quantity", request.quantity)
