@@ -252,7 +252,7 @@ def _snapshot_from_dict(payload: dict[str, Any] | None) -> CalculationSnapshot |
     pricing_values = tuple(
         PricingValueSnapshot(
             key=str(value["key"]),
-            value=_deserialize_value(value["value"]),
+            value=_deserialize_pricing_value(value.get("value"), value.get("value_type")),
             source_profile_id=UUID(value["source_profile_id"]),
         )
         for value in payload.get("pricing_values", [])
@@ -278,6 +278,14 @@ def _snapshot_from_dict(payload: dict[str, Any] | None) -> CalculationSnapshot |
         calculation=calculation,
         engine_version=str(payload["engine_version"]),
     )
+
+
+def _deserialize_pricing_value(value: Any, value_type: str | None) -> Any:
+    if value_type == "decimal":
+        return Decimal(str(value))
+    if value_type == "boolean":
+        return bool(value)
+    return value
 
 
 def _deserialize_value(value: Any) -> Any:
