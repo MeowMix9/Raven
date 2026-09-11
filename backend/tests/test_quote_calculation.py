@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from raven.pricing.models import ResolvedPricingValue
 from raven.pricing.pipeline import CalculationLine
-from raven.pricing.resolver import PricingResolver, ResolvedPricingContext
+from raven.pricing.resolver import PricingResolver
 from raven.pricing.rules import PricingRule
 from raven.quotes.calculation import CalculateQuote, QuoteCalculationRequest
 
@@ -55,7 +55,7 @@ def make_service(repository: FakePricingRepository) -> CalculateQuote:
     return CalculateQuote(PricingResolver(repository), repository)
 
 
-def test_calculate_quote_orchestrates_resolution_rules_and_pipeline() -> None:
+def test_calculate_quote_orchestrates_resolution_rules_pipeline_and_snapshot() -> None:
     repository = FakePricingRepository()
     customer_id = uuid4()
     product_id = uuid4()
@@ -82,6 +82,8 @@ def test_calculate_quote_orchestrates_resolution_rules_and_pipeline() -> None:
     assert result.calculation.total_cost == Decimal("200.00")
     assert result.calculation.total_price == Decimal("250.0000")
     assert result.calculation.applied_rule_ids == (repository.rules[0].id,)
+    assert result.snapshot.pricing_profile_id == PROFILE_ID
+    assert result.snapshot.calculation.total_price == Decimal("250.0000")
     assert repository.requested_customer_id == customer_id
     assert repository.requested_product_id == product_id
 
@@ -115,6 +117,7 @@ def test_calculate_quote_preserves_custom_context_for_rule_evaluation() -> None:
     )
 
     assert result.calculation.total_price == Decimal("30.00")
+    assert result.snapshot.rule_changes[0].rule_id == repository.rules[0].id
 
 
 def test_calculate_quote_rejects_non_object_quote_context() -> None:
