@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from raven.pricing.resolver import ResolvedPricingValue
+from raven.pricing.models import ResolvedPricingValue
 from raven.pricing.rules import PricingRule
 
 
