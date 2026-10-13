@@ -14,6 +14,11 @@ from raven.core.config import get_settings
 from raven.database.session import get_session_factory
 from raven.infrastructure.models.inventory import InventoryApiClient, InventorySnapshot
 
+# FastAPI dependency injection uses Depends() in parameter defaults.
+# ruff: noqa: B008
+
+router = APIRouter(prefix="/api/v1/inventory", tags=["inventory"])
+
 router = APIRouter(prefix="/api/v1/inventory", tags=["inventory"])
 
 
