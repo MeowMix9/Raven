@@ -44,7 +44,7 @@ def test_non_matching_rule_is_ignored() -> None:
         "00000000-0000-0000-0000-000000000002",
         10,
         {"field": "quantity", "operator": "gte", "value": 100},
-        {"type": "apply_markup", "value": "0.25"},
+        {"type": "apply_markup", "target": "price", "value": "0.25"},
     )
 
     result = evaluator.evaluate((pricing_rule,), {"quantity": 50})
@@ -59,7 +59,7 @@ def test_disabled_rule_is_ignored() -> None:
         "00000000-0000-0000-0000-000000000003",
         10,
         {},
-        {"type": "rush_fee", "value": "15"},
+        {"type": "set_value", "target": "price", "value": "15"},,
         enabled=False,
     )
 
