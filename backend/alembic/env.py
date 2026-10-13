@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from raven.core.config import get_settings
 from raven.database.base import Base
 import raven.infrastructure.models.entities  # noqa: F401
+import raven.infrastructure.models.inventory  # noqa: F401
 
 config = context.config
 settings = get_settings()
