@@ -27,14 +27,15 @@ def test_matching_rule_produces_configured_action() -> None:
         "00000000-0000-0000-0000-000000000001",
         10,
         {"field": "quantity", "operator": "gte", "value": 100},
-        assert result.changes == (
-    {"type": "apply_markup", "target": "price", "value": "0.25"},
-)
+        {"type": "apply_markup", "target": "price", "value": "0.25"},
+    )
 
     result = evaluator.evaluate((pricing_rule,), {"quantity": Decimal("125")})
 
     assert result.applied_rule_ids == (pricing_rule.id,)
-    assert result.changes == ({"type": "apply_markup", "value": "0.25"},)
+    assert result.changes == (
+        {"type": "apply_markup", "target": "price", "value": "0.25"},
+    )
 
 
 def test_non_matching_rule_is_ignored() -> None:
