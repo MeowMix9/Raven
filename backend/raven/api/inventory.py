@@ -46,7 +46,7 @@ class InventoryImport(BaseModel):
     items: list[InventoryRecord] = Field(min_length=1, max_length=100000)
 
     @model_validator(mode="after")
-    def reject_duplicate_skus(self) -> "InventoryImport":
+    def reject_duplicate_skus(self) -> InventoryImport:
         skus = [item.sku.casefold() for item in self.items]
         if len(skus) != len(set(skus)):
             raise ValueError("Inventory import contains duplicate SKUs")
