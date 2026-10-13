@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
     log_level: str = "INFO"
     database_url: str | None = None
+    inventory_ingest_key: str | None = None
     cors_origins: list[str] = ["http://localhost:5173"]
 
 

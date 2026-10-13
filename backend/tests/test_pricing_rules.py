@@ -27,13 +27,15 @@ def test_matching_rule_produces_configured_action() -> None:
         "00000000-0000-0000-0000-000000000001",
         10,
         {"field": "quantity", "operator": "gte", "value": 100},
-        {"type": "apply_markup", "value": "0.25"},
+        {"type": "apply_markup", "target": "price", "value": "0.25"},
     )
 
     result = evaluator.evaluate((pricing_rule,), {"quantity": Decimal("125")})
 
     assert result.applied_rule_ids == (pricing_rule.id,)
-    assert result.changes == ({"type": "apply_markup", "value": "0.25"},)
+    assert result.changes == (
+        {"type": "apply_markup", "target": "price", "value": "0.25"},
+    )
 
 
 def test_non_matching_rule_is_ignored() -> None:
@@ -42,7 +44,7 @@ def test_non_matching_rule_is_ignored() -> None:
         "00000000-0000-0000-0000-000000000002",
         10,
         {"field": "quantity", "operator": "gte", "value": 100},
-        {"type": "apply_markup", "value": "0.25"},
+        {"type": "apply_markup", "target": "price", "value": "0.25"},
     )
 
     result = evaluator.evaluate((pricing_rule,), {"quantity": 50})
@@ -57,7 +59,7 @@ def test_disabled_rule_is_ignored() -> None:
         "00000000-0000-0000-0000-000000000003",
         10,
         {},
-        {"type": "rush_fee", "value": "15"},
+        {"type": "set_value", "target": "price", "value": "15"},
         enabled=False,
     )
 
@@ -77,7 +79,7 @@ def test_all_conditions_must_match() -> None:
                 {"field": "product.category", "operator": "eq", "value": "shirt"},
             ]
         },
-        {"type": "discount", "value": "0.10"},
+        {"type": "apply_discount", "target": "price", "value": "0.10"},
     )
 
     assert evaluator.evaluate((pricing_rule,), {"quantity": 100, "product": {"category": "shirt"}}).applied_rule_ids == (pricing_rule.id,)
@@ -95,7 +97,7 @@ def test_any_condition_can_match() -> None:
                 {"field": "quantity", "operator": "gte", "value": 500},
             ]
         },
-        {"type": "minimum_charge", "value": "100"},
+        {"type": "set_minimum", "target": "price", "value": "100"},
     )
 
     result = evaluator.evaluate((pricing_rule,), {"customer": {"type": "retail"}, "quantity": 500})
@@ -109,13 +111,13 @@ def test_rules_execute_in_priority_order() -> None:
         "00000000-0000-0000-0000-000000000010",
         10,
         {},
-        {"type": "low"},
+        {"type": "set_value", "target": "price", "value": "10"},
     )
     high = rule(
         "00000000-0000-0000-0000-000000000011",
         20,
         {},
-        {"type": "high"},
+        {"type": "set_value", "target": "price", "value": "20"},
     )
 
     result = evaluator.evaluate((low, high), {})
@@ -132,7 +134,7 @@ def test_supported_comparison_operators() -> None:
             "00000000-0000-0000-0000-000000000020",
             1,
             {"field": "value", "operator": operator, "value": expected},
-            {"type": "test"},
+            {"type": "set_value", "target": "price", "value": "10"},
         )
         assert evaluator.evaluate((pricing_rule,), context).applied_rule_ids == (pricing_rule.id,)
 
@@ -142,7 +144,7 @@ def test_supported_comparison_operators() -> None:
             "00000000-0000-0000-0000-000000000021",
             1,
             {"field": field, "operator": operator, "value": expected},
-            {"type": "test"},
+            {"type": "set_value", "target": "price", "value": "10"},
         )
         assert evaluator.evaluate((pricing_rule,), context).applied_rule_ids == (pricing_rule.id,)
 
@@ -153,13 +155,13 @@ def test_null_operators_work_for_missing_fields() -> None:
         "00000000-0000-0000-0000-000000000030",
         1,
         {"field": "missing", "operator": "is_null"},
-        {"type": "test"},
+        {"type": "set_value", "target": "price", "value": "10"},
     )
     is_not_null = rule(
         "00000000-0000-0000-0000-000000000031",
         1,
         {"field": "value", "operator": "is_not_null"},
-        {"type": "test"},
+        {"type": "set_value", "target": "price", "value": "10"},
     )
 
     result = evaluator.evaluate((is_null, is_not_null), {"value": 1})
