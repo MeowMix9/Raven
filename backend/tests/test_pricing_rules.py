@@ -59,7 +59,7 @@ def test_disabled_rule_is_ignored() -> None:
         "00000000-0000-0000-0000-000000000003",
         10,
         {},
-        {"type": "set_value", "target": "price", "value": "15"},,
+        {"type": "set_value", "target": "price", "value": "15"},
         enabled=False,
     )
 
