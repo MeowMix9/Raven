@@ -79,7 +79,8 @@ A missing threshold means no client-specific quantity filter. The shared importe
 3. From `backend/`, install the project and apply migrations:
 
    ```bash
-   pip install -e ".[dev]"
+   python -m pip install -e .
+   python -m pip install pytest ruff httpx
    alembic upgrade head
    ```
 
