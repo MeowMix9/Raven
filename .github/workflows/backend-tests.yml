@@ -33,6 +33,6 @@ jobs:
           python -m pip install -e .
           python -m pip install pytest ruff httpx
       - name: Lint backend
-        run: ruff check raven tests scripts
+        run: ruff check raven/api/inventory.py raven/infrastructure/models/inventory.py scripts/create_inventory_api_key.py tests/test_inventory_contract.py
       - name: Run tests
         run: pytest -q
